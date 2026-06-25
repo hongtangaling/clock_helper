@@ -1,0 +1,6 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Application theme for dark mode. -->
+    <style name="Base.Theme.Clock_helper" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <!-- Customize your dark theme here. -->
+    </style>
+</resources>
