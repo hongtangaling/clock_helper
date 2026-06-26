@@ -9,8 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.kongshuo.clock_helper.MainActivity
-import com.kongshuo.clock_helper.R
 import com.kongshuo.clock_helper.domain.scheduler.AlarmScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -121,26 +119,15 @@ class AlarmService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val activityIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val activityPendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            activityIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentIntent(activityPendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, "关闭", stopPendingIntent)
+            .setContentIntent(stopPendingIntent) // 点击通知直接关闭闹钟
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setFullScreenIntent(activityPendingIntent, true)
+            .setFullScreenIntent(stopPendingIntent, true) // 全屏点击也关闭闹钟
             .build()
     }
 

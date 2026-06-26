@@ -139,18 +139,33 @@ class AlarmPlayer @Inject constructor(
 
     private fun startVibration() {
         isVibrating = true
-        // 震动模式：响 1 秒，停 0.5 秒
-        val pattern = longArrayOf(0, 1000, 500)
         vibrator?.let {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val effect = VibrationEffect.createWaveform(pattern, 0) // 重复
-                it.vibrate(effect)
-            } else {
-                @Suppress("DEPRECATION")
-                it.vibrate(pattern, 0)
+            try {
+                // 震动模式：响 1 秒，停 0.5 秒，重复
+                val pattern = longArrayOf(1000, 500)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // VibrationEffect.createWaveform(timings, repeatIndex) —
+                    // timings 数组各项依次表示震动/停顿的时长
+                    val effect = VibrationEffect.createWaveform(pattern, 0)
+                    it.vibrate(effect)
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.vibrate(pattern, 0)
+                }
+            } catch (e: Exception) {
+                // VibrationEffect 在某些 OEM ROM 上可能不支持，回退到旧版 API
+                try {
+                    @Suppress("DEPRECATION")
+                    it.vibrate(longArrayOf(1000, 500), 0)
+                } catch (_: Exception) { }
             }
         }
     }
+
+    /**
+     * 检测并打印振动器状态（用于调试）
+     */
+    fun hasVibrator(): Boolean = vibrator?.hasVibrator() == true
 
     private fun requestAudioFocus(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
