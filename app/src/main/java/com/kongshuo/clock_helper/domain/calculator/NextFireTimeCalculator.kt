@@ -37,24 +37,62 @@ object NextFireTimeCalculator {
         val now = Calendar.getInstance().apply { timeInMillis = nowMillis }
         val target = Calendar.getInstance().apply { timeInMillis = nowMillis }
 
-        // 设置目标时间为闹钟设定的时/分
+        // ============================================================
+        // 频率模式特殊处理：有 lastFiredAt 时，直接基于上次触发时间计算
+        // ============================================================
+        if (!alarm.isDailyReminder && alarm.reminderFrequencyMinutes > 0 && alarm.lastFiredAt != null) {
+            target.timeInMillis = alarm.lastFiredAt!!
+            // 跳过已过去的间隔，找到下一个将来时间
+            do {
+                target.add(Calendar.MINUTE, alarm.reminderFrequencyMinutes)
+            } while (target.timeInMillis <= nowMillis)
+
+            // 免打扰检查（频率模式下仍尊重免打扰时段）
+            if (alarm.isQuietTimeEnabled) {
+                val quietResult = checkQuietTime(
+                    target, alarm.quietStartHour, alarm.quietStartMinute,
+                    alarm.quietEndHour, alarm.quietEndMinute
+                )
+                if (quietResult != null) {
+                    target.timeInMillis = quietResult.timeInMillis
+                }
+            }
+
+            return Result(fireTimeMillis = target.timeInMillis)
+        }
+
+        // ============================================================
+        // 每日提醒 / 频率模式的首次触发：以设定的时:分为锚点
+        // ============================================================
         target.set(Calendar.HOUR_OF_DAY, alarm.hour)
         target.set(Calendar.MINUTE, alarm.minute)
         target.set(Calendar.SECOND, 0)
         target.set(Calendar.MILLISECOND, 0)
 
-        // 如果今天的目标时间已经过了，推到下一个可用日期
-        if (target.timeInMillis <= now.timeInMillis) {
-            target.add(Calendar.DAY_OF_YEAR, 1)
+        val isFrequencyMode = !alarm.isDailyReminder && alarm.reminderFrequencyMinutes > 0
+
+        if (isFrequencyMode) {
+            // 频率模式首次触发：时间已过则跳到下一个频率间隔，而非推到明天
+            if (target.timeInMillis <= now.timeInMillis) {
+                val elapsedMs = now.timeInMillis - target.timeInMillis
+                val intervalMs = alarm.reminderFrequencyMinutes * 60_000L
+                val intervalsToSkip = (elapsedMs / intervalMs) + 1
+                target.timeInMillis += intervalsToSkip * intervalMs
+            }
+        } else {
+            // 每日提醒：时间已过则推到明天
+            if (target.timeInMillis <= now.timeInMillis) {
+                target.add(Calendar.DAY_OF_YEAR, 1)
+            }
         }
 
-        // 根据提醒类型调整
+        // 根据提醒类型调整（每日模式才检查节假日和排除日）
         var maxIterations = 365 // 防止死循环
         while (maxIterations-- > 0) {
             var adjusted = false
 
-            // 节假日跳过
-            if (alarm.isHolidaySkipped) {
+            // 节假日跳过（仅每日模式）
+            if (!isFrequencyMode && alarm.isHolidaySkipped) {
                 val dateStr = dateToStr(target)
                 if (isHolidayCheck(dateStr)) {
                     target.add(Calendar.DAY_OF_YEAR, 1)
@@ -62,26 +100,12 @@ object NextFireTimeCalculator {
                 }
             }
 
-            // 排除日检查（工作日模式）
-            if (!adjusted && alarm.excludedDaysBitmask != 0) {
+            // 排除日检查（仅每日模式）
+            if (!adjusted && !isFrequencyMode && alarm.excludedDaysBitmask != 0) {
                 val dayOfWeek = target.get(Calendar.DAY_OF_WEEK) // 1=Sun, 2=Mon, ..., 7=Sat
                 if (AlarmEntity.isDayExcluded(alarm.excludedDaysBitmask, dayOfWeek)) {
                     target.add(Calendar.DAY_OF_YEAR, 1)
                     adjusted = true
-                }
-            }
-
-            // 非每日提醒（按频率天数）
-            if (!adjusted && !alarm.isDailyReminder && alarm.reminderFrequencyMinutes > 0) {
-                // 对于频率模式，使用递进天数
-                // 这里简化为：每次触发后，下次触发 = 当前 + frequency
-                // 实际应用中应该跟踪 lastFiredAt
-                if (alarm.lastFiredAt != null) {
-                    val lastFire = Calendar.getInstance().apply { timeInMillis = alarm.lastFiredAt!! }
-                    lastFire.add(Calendar.MINUTE, alarm.reminderFrequencyMinutes)
-                    if (lastFire.after(target)) {
-                        target.timeInMillis = lastFire.timeInMillis
-                    }
                 }
             }
 

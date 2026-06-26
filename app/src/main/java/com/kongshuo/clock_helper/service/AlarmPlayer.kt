@@ -36,12 +36,27 @@ class AlarmPlayer @Inject constructor(
 
     init {
         audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vm.defaultVibrator
-        } else {
+        vibrator = vibratorFromContext(context)
+    }
+
+    /**
+     * 获取系统 Vibrator，优先使用 VibratorManager（Android 12+），
+     * 失败时回退到旧版 VIBRATOR_SERVICE
+     */
+    private fun vibratorFromContext(context: Context): Vibrator? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator?.let { return it }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return try {
             @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -100,7 +115,7 @@ class AlarmPlayer @Inject constructor(
         isVibrating = false
 
         mediaPlayer?.apply {
-            if (isPlaying) stop()
+            stop()     // 停止 MediaPlayer 播放
             release()
         }
         mediaPlayer = null

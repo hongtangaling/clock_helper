@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -34,6 +35,7 @@ class PermissionManager @Inject constructor(
     /**
      * 检查精确闹钟权限 (Android 12+)
      */
+    @RequiresApi(Build.VERSION_CODES.S)
     fun hasExactAlarmPermission(): Boolean {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
         return alarmManager.canScheduleExactAlarms()
@@ -84,6 +86,7 @@ class PermissionManager @Inject constructor(
         val isIgnoringBatteryOptimizations: Boolean
     )
 
+    @RequiresApi(Build.VERSION_CODES.S)
     fun getPermissionStatus(): PermissionStatus {
         return PermissionStatus(
             hasNotificationPermission = hasNotificationPermission(),
@@ -95,6 +98,7 @@ class PermissionManager @Inject constructor(
     /**
      * 检查是否可以保存闹钟（关键权限）
      */
+    @RequiresApi(Build.VERSION_CODES.S)
     fun canSaveAlarm(): Boolean {
         return hasNotificationPermission() && hasExactAlarmPermission()
     }

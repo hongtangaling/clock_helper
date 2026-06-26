@@ -48,11 +48,22 @@ fun AlarmEditorScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    // 使用 rememberTimePickerState 创建时间选择器状态
     val timePickerState = rememberTimePickerState(
         initialHour = state.hour,
         initialMinute = state.minute,
         is24Hour = true
     )
+
+    // 编辑模式下数据加载完成后，同步实际时间到 TimePicker
+    if (state.isEditMode) {
+        androidx.compose.runtime.LaunchedEffect(state.isDataLoaded) {
+            if (state.isDataLoaded) {
+                timePickerState.hour = state.hour
+                timePickerState.minute = state.minute
+            }
+        }
+    }
 
     Scaffold(
         topBar = {

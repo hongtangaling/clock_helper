@@ -48,13 +48,14 @@ class AlarmReceiver : BroadcastReceiver() {
         // 更新闹钟最后触发时间
         CoroutineScope(Dispatchers.IO).launch {
             val alarm = alarmRepository.getAlarmById(alarmId) ?: return@launch
-            alarmRepository.updateAlarm(alarm.copy(lastFiredAt = System.currentTimeMillis()))
+            val updatedAlarm = alarm.copy(lastFiredAt = System.currentTimeMillis())
+            alarmRepository.updateAlarm(updatedAlarm)
 
-            // 重新调度下次触发
+            // 重新调度下次触发（使用更新后的 alarm，lastFiredAt 对频率模式计算至关重要）
             val calculator = com.kongshuo.clock_helper.domain.calculator.NextFireTimeCalculator
-            val result = calculator.calculate(alarm)
+            val result = calculator.calculate(updatedAlarm)
             if (result != null) {
-                alarmScheduler.schedule(alarm, result.fireTimeMillis)
+                alarmScheduler.schedule(updatedAlarm, result.fireTimeMillis)
             }
         }
     }

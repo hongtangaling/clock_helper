@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kongshuo.clock_helper.data.entity.AlarmEntity
 import com.kongshuo.clock_helper.data.repository.AlarmRepository
+import com.kongshuo.clock_helper.domain.calculator.NextFireTimeCalculator
+import com.kongshuo.clock_helper.domain.scheduler.AlarmScheduler
 import com.kongshuo.clock_helper.permission.PermissionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +18,7 @@ import javax.inject.Inject
 
 data class EditorUiState(
     val isEditMode: Boolean = false,
+    val isDataLoaded: Boolean = false,
     val hour: Int = 8,
     val minute: Int = 0,
     val label: String = "",
@@ -40,6 +43,7 @@ data class EditorUiState(
 class AlarmEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val alarmRepository: AlarmRepository,
+    private val alarmScheduler: AlarmScheduler,
     private val permissionManager: PermissionManager
 ) : ViewModel() {
 
@@ -51,6 +55,8 @@ class AlarmEditorViewModel @Inject constructor(
     init {
         if (alarmId != null && alarmId > 0) {
             loadAlarm(alarmId)
+        } else {
+            _uiState.value = _uiState.value.copy(isDataLoaded = true)
         }
         checkPermissions()
     }
@@ -59,6 +65,7 @@ class AlarmEditorViewModel @Inject constructor(
         viewModelScope.launch {
             val alarm = alarmRepository.getAlarmById(id) ?: return@launch
             _uiState.value = _uiState.value.copy(
+                isDataLoaded = true,
                 isEditMode = true,
                 hour = alarm.hour,
                 minute = alarm.minute,
@@ -128,10 +135,21 @@ class AlarmEditorViewModel @Inject constructor(
                 updatedAt = System.currentTimeMillis()
             )
 
+            val savedId: Long
             if (state.isEditMode) {
                 alarmRepository.updateAlarm(entity)
+                savedId = alarmId ?: 0
             } else {
-                alarmRepository.insertAlarm(entity)
+                savedId = alarmRepository.insertAlarm(entity)
+            }
+
+            // 将闹钟注册到 AlarmManager，到点才能触发
+            if (state.isEnabled) {
+                val savedEntity = entity.copy(id = savedId)
+                val result = NextFireTimeCalculator.calculate(savedEntity)
+                if (result != null) {
+                    alarmScheduler.schedule(savedEntity, result.fireTimeMillis)
+                }
             }
 
             onSuccess()
