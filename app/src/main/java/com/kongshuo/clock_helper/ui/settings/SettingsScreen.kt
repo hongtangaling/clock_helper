@@ -55,6 +55,15 @@ fun SettingsScreen(
     val context = LocalContext.current
     val powerManager = context.getSystemService(android.content.Context.POWER_SERVICE) as PowerManager
 
+    // 自动获取版本号
+    val versionName = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "未知"
+        } catch (_: Exception) {
+            "未知"
+        }
+    }
+
     var hasNotificationPermission by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -164,7 +173,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "版本 1.0",
+                        text = "版本 $versionName",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
