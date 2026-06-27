@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kongshuo.clock_helper.data.entity.AlarmEntity
+import com.kongshuo.clock_helper.data.entity.QuietTimePeriod
 import com.kongshuo.clock_helper.data.repository.AlarmRepository
 import com.kongshuo.clock_helper.domain.calculator.NextFireTimeCalculator
 import com.kongshuo.clock_helper.domain.scheduler.AlarmScheduler
@@ -30,11 +31,7 @@ data class EditorUiState(
     val isHolidaySkipped: Boolean = false,
     val excludedDaysBitmask: Int = 0,
     val isVibrate: Boolean = true,
-    val isQuietTimeEnabled: Boolean = false,
-    val quietStartHour: Int = 22,
-    val quietStartMinute: Int = 0,
-    val quietEndHour: Int = 8,
-    val quietEndMinute: Int = 0,
+    val quietTimePeriods: List<QuietTimePeriod> = emptyList(),
     val isEnabled: Boolean = true,
     val canSave: Boolean = true
 )
@@ -78,11 +75,7 @@ class AlarmEditorViewModel @Inject constructor(
                 isHolidaySkipped = alarm.isHolidaySkipped,
                 excludedDaysBitmask = alarm.excludedDaysBitmask,
                 isVibrate = alarm.isVibrate,
-                isQuietTimeEnabled = alarm.isQuietTimeEnabled,
-                quietStartHour = alarm.quietStartHour,
-                quietStartMinute = alarm.quietStartMinute,
-                quietEndHour = alarm.quietEndHour,
-                quietEndMinute = alarm.quietEndMinute,
+                quietTimePeriods = QuietTimePeriod.fromJson(alarm.quietTimePeriodsJson),
                 isEnabled = alarm.isEnabled
             )
         }
@@ -106,9 +99,10 @@ class AlarmEditorViewModel @Inject constructor(
     fun updateHolidaySkip(skip: Boolean) { _uiState.value = _uiState.value.copy(isHolidaySkipped = skip) }
     fun updateExcludedDays(bitmask: Int) { _uiState.value = _uiState.value.copy(excludedDaysBitmask = bitmask) }
     fun updateVibrate(vibrate: Boolean) { _uiState.value = _uiState.value.copy(isVibrate = vibrate) }
-    fun updateQuietTimeEnabled(enabled: Boolean) { _uiState.value = _uiState.value.copy(isQuietTimeEnabled = enabled) }
-    fun updateQuietStart(hour: Int, minute: Int) { _uiState.value = _uiState.value.copy(quietStartHour = hour, quietStartMinute = minute) }
-    fun updateQuietEnd(hour: Int, minute: Int) { _uiState.value = _uiState.value.copy(quietEndHour = hour, quietEndMinute = minute) }
+
+    fun updateQuietTimePeriods(periods: List<QuietTimePeriod>) {
+        _uiState.value = _uiState.value.copy(quietTimePeriods = periods)
+    }
 
     fun save(onSuccess: () -> Unit) {
         viewModelScope.launch {
@@ -127,11 +121,7 @@ class AlarmEditorViewModel @Inject constructor(
                 excludedDaysBitmask = state.excludedDaysBitmask,
                 label = state.label,
                 isVibrate = state.isVibrate,
-                isQuietTimeEnabled = state.isQuietTimeEnabled,
-                quietStartHour = state.quietStartHour,
-                quietStartMinute = state.quietStartMinute,
-                quietEndHour = state.quietEndHour,
-                quietEndMinute = state.quietEndMinute,
+                quietTimePeriodsJson = QuietTimePeriod.toJson(state.quietTimePeriods),
                 updatedAt = System.currentTimeMillis()
             )
 

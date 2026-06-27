@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kongshuo.clock_helper.data.entity.AlarmEntity
+import com.kongshuo.clock_helper.data.entity.QuietTimePeriod
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -181,8 +182,9 @@ private fun buildRepeatInfo(alarm: AlarmEntity): String {
     if (alarm.isHolidaySkipped) {
         parts.add("跳过节假日")
     }
-    if (alarm.isQuietTimeEnabled) {
-        parts.add("免打扰")
+    val periods = QuietTimePeriod.fromJson(alarm.quietTimePeriodsJson)
+    if (periods.isNotEmpty()) {
+        parts.add("${periods.size}个免打扰时段")
     }
 
     return parts.joinToString(" · ")

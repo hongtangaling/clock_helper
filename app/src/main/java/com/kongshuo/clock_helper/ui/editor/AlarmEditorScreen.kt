@@ -171,14 +171,8 @@ fun AlarmEditorScreen(
 
             // 免打扰时段
             QuietTimeSelector(
-                isEnabled = state.isQuietTimeEnabled,
-                startHour = state.quietStartHour,
-                startMinute = state.quietStartMinute,
-                endHour = state.quietEndHour,
-                endMinute = state.quietEndMinute,
-                onEnabledChange = viewModel::updateQuietTimeEnabled,
-                onStartChange = viewModel::updateQuietStart,
-                onEndChange = viewModel::updateQuietEnd
+                periods = state.quietTimePeriods,
+                onPeriodsChange = viewModel::updateQuietTimePeriods
             )
 
             Spacer(modifier = Modifier.height(16.dp))

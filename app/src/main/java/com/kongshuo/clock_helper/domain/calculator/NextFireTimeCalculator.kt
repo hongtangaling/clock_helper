@@ -1,6 +1,7 @@
 package com.kongshuo.clock_helper.domain.calculator
 
 import com.kongshuo.clock_helper.data.entity.AlarmEntity
+import com.kongshuo.clock_helper.data.entity.QuietTimePeriod
 import java.util.Calendar
 
 /**
@@ -36,6 +37,7 @@ object NextFireTimeCalculator {
     ): Result? {
         val now = Calendar.getInstance().apply { timeInMillis = nowMillis }
         val target = Calendar.getInstance().apply { timeInMillis = nowMillis }
+        val quietPeriods = QuietTimePeriod.fromJson(alarm.quietTimePeriodsJson)
 
         // ============================================================
         // 频率模式特殊处理：有 lastFiredAt 时，直接基于上次触发时间计算
@@ -48,14 +50,9 @@ object NextFireTimeCalculator {
             } while (target.timeInMillis <= nowMillis)
 
             // 免打扰检查（频率模式下仍尊重免打扰时段）
-            if (alarm.isQuietTimeEnabled) {
-                val quietResult = checkQuietTime(
-                    target, alarm.quietStartHour, alarm.quietStartMinute,
-                    alarm.quietEndHour, alarm.quietEndMinute
-                )
-                if (quietResult != null) {
-                    target.timeInMillis = quietResult.timeInMillis
-                }
+            val quietEnd = findQuietTimeEnd(target, quietPeriods)
+            if (quietEnd != null) {
+                target.timeInMillis = quietEnd
             }
 
             return Result(fireTimeMillis = target.timeInMillis)
@@ -109,15 +106,11 @@ object NextFireTimeCalculator {
                 }
             }
 
-            // 免打扰检查
-            if (!adjusted && alarm.isQuietTimeEnabled) {
-                val quietResult = checkQuietTime(
-                    target, alarm.quietStartHour, alarm.quietStartMinute,
-                    alarm.quietEndHour, alarm.quietEndMinute
-                )
-                if (quietResult != null) {
-                    // 推迟到免打扰结束
-                    target.timeInMillis = quietResult.timeInMillis
+            // 免打扰检查（多时段）
+            if (!adjusted && quietPeriods.isNotEmpty()) {
+                val quietEnd = findQuietTimeEnd(target, quietPeriods)
+                if (quietEnd != null) {
+                    target.timeInMillis = quietEnd
                     adjusted = true
                 }
             }
@@ -131,48 +124,50 @@ object NextFireTimeCalculator {
     }
 
     /**
-     * 检查目标时间是否在免打扰时段内
-     * @return 免打扰结束的时间戳（Calendar），如果在时段外则返回 null
+     * 在多个免打扰时段中检查目标时间，返回最近的结束时间戳
+     * @return 如果目标时间落在任何免打扰时段内，返回该时段的结束时间戳（Calendar.timeInMillis），否则返回 null
      */
-    private fun checkQuietTime(
-        target: Calendar,
-        quietStartHour: Int,
-        quietStartMinute: Int,
-        quietEndHour: Int,
-        quietEndMinute: Int
-    ): Calendar? {
+    private fun findQuietTimeEnd(target: Calendar, periods: List<QuietTimePeriod>): Long? {
+        if (periods.isEmpty()) return null
+
         val targetMinutes = target.get(Calendar.HOUR_OF_DAY) * 60 + target.get(Calendar.MINUTE)
-        val startMinutes = quietStartHour * 60 + quietStartMinute
-        val endMinutes = quietEndHour * 60 + quietEndMinute
+        var earliestResult: Long? = null
 
-        val isCrossDay = endMinutes <= startMinutes // 跨天免打扰
+        for (period in periods) {
+            val startMinutes = period.startHour * 60 + period.startMinute
+            val endMinutes = period.endHour * 60 + period.endMinute
+            val isCrossDay = endMinutes <= startMinutes // 跨天免打扰
 
-        val inQuietTime = if (isCrossDay) {
-            // 跨天: 从 start 到午夜(1440) 或 从0到 end
-            targetMinutes >= startMinutes || targetMinutes < endMinutes
-        } else {
-            // 同天: start <= target < end
-            targetMinutes in startMinutes until endMinutes
+            val inQuietTime = if (isCrossDay) {
+                targetMinutes >= startMinutes || targetMinutes < endMinutes
+            } else {
+                targetMinutes in startMinutes until endMinutes
+            }
+
+            if (!inQuietTime) continue
+
+            // 计算该时段的结束时间
+            val end = target.clone() as Calendar
+            if (isCrossDay && targetMinutes < endMinutes) {
+                // 已经在跨天的后半段（午夜后），结束时间在今天
+                end.set(Calendar.HOUR_OF_DAY, period.endHour)
+                end.set(Calendar.MINUTE, period.endMinute)
+            } else {
+                // 在跨天的前半段或同天，结束时间在明天
+                end.add(Calendar.DAY_OF_YEAR, 1)
+                end.set(Calendar.HOUR_OF_DAY, period.endHour)
+                end.set(Calendar.MINUTE, period.endMinute)
+            }
+            end.set(Calendar.SECOND, 0)
+            end.set(Calendar.MILLISECOND, 0)
+
+            val endMs = end.timeInMillis
+            if (earliestResult == null || endMs < earliestResult) {
+                earliestResult = endMs
+            }
         }
 
-        if (!inQuietTime) return null
-
-        // 计算免打扰结束时间
-        val end = target.clone() as Calendar
-        if (isCrossDay && targetMinutes < endMinutes) {
-            // 已经在跨天的后半段（午夜后），结束时间在今天
-            end.set(Calendar.HOUR_OF_DAY, quietEndHour)
-            end.set(Calendar.MINUTE, quietEndMinute)
-        } else {
-            // 在跨天的前半段或同天，结束时间在明天
-            end.add(Calendar.DAY_OF_YEAR, 1)
-            end.set(Calendar.HOUR_OF_DAY, quietEndHour)
-            end.set(Calendar.MINUTE, quietEndMinute)
-        }
-        end.set(Calendar.SECOND, 0)
-        end.set(Calendar.MILLISECOND, 0)
-
-        return end
+        return earliestResult
     }
 
     private fun dateToStr(cal: Calendar): String {
@@ -180,17 +175,5 @@ object NextFireTimeCalculator {
         val m = cal.get(Calendar.MONTH) + 1
         val d = cal.get(Calendar.DAY_OF_MONTH)
         return "%04d-%02d-%02d".format(y, m, d)
-    }
-
-    /**
-     * 检查免打扰是否覆盖全天
-     */
-    fun isFullDayQuietTime(
-        startHour: Int, startMinute: Int,
-        endHour: Int, endMinute: Int
-    ): Boolean {
-        val start = startHour * 60 + startMinute
-        val end = endHour * 60 + endMinute
-        return start == 0 && end == 1439
     }
 }

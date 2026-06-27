@@ -21,12 +21,20 @@ data class AlarmEntity(
     val isVibrate: Boolean = true,          // 是否震动
     val lastFiredAt: Long? = null,          // 上次触发时间戳
 
-    // 免打扰时间段
-    val isQuietTimeEnabled: Boolean = false, // 是否启用免打扰
-    val quietStartHour: Int = 22,            // 免打扰开始小时
-    val quietStartMinute: Int = 0,           // 免打扰开始分钟
-    val quietEndHour: Int = 8,               // 免打扰结束小时
-    val quietEndMinute: Int = 0,             // 免打扰结束分钟
+    // 多免打扰时间段（JSON 字符串）
+    val quietTimePeriodsJson: String = "",   // 多个免打扰时段，空串表示无
+
+    // 以下旧字段保留仅用于数据库 v1→v2 迁移兼容，新代码不再使用
+    @Deprecated("使用 quietTimePeriodsJson")
+    val isQuietTimeEnabled: Boolean = false,
+    @Deprecated("使用 quietTimePeriodsJson")
+    val quietStartHour: Int = 0,
+    @Deprecated("使用 quietTimePeriodsJson")
+    val quietStartMinute: Int = 0,
+    @Deprecated("使用 quietTimePeriodsJson")
+    val quietEndHour: Int = 0,
+    @Deprecated("使用 quietTimePeriodsJson")
+    val quietEndMinute: Int = 0,
 
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()

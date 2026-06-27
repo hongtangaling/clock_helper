@@ -9,7 +9,7 @@ import com.kongshuo.clock_helper.data.entity.HolidayEntity
 
 @Database(
     entities = [AlarmEntity::class, HolidayEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class ClockDatabase : RoomDatabase() {
