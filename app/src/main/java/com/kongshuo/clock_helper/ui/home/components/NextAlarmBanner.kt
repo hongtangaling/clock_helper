@@ -49,7 +49,16 @@ fun NextAlarmBanner(
 
     val hours = TimeUnit.MILLISECONDS.toHours(remainingMillis)
     val minutes = TimeUnit.MILLISECONDS.toMinutes(remainingMillis) % 60
-    val timeStr = "%02d:%02d".format(alarm.hour, alarm.minute)
+    // 频率提醒显示实际的下次触发时间，每日提醒显示设定的固定时间
+    val timeStr = if (!alarm.isDailyReminder && alarm.reminderFrequencyMinutes > 0) {
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = fireTimeMillis }
+        "%02d:%02d".format(
+            cal.get(java.util.Calendar.HOUR_OF_DAY),
+            cal.get(java.util.Calendar.MINUTE)
+        )
+    } else {
+        "%02d:%02d".format(alarm.hour, alarm.minute)
+    }
 
     Row(
         modifier = modifier
